@@ -188,16 +188,7 @@ function loadDataFromStorage() {
     ]));
     localStorage.setItem('edulearn_seeded', 'true');
     
-    currentUser = JSON.parse(JSON.stringify(INITIAL_USERS[0]));
-    currentUser.enrolledCourses = ["py-1", "ds-1"];
-    currentUser.completedLectures = { "py-1": ["py-1-1", "py-1-2", "py-1-3"], "ds-1": ["ds-1-1"] };
-    currentUser.studyHours = 47;
-    currentUser.certsCount = 0;
-    currentUser.examAttempts = { "quiz-py": 0, "quiz-ds": 0 }; 
-    currentUser.examPassed = {}; 
-    currentUser.examScores = {}; 
-    currentUser.examHistory = [];
-    localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+    currentUser = null;
   } else {
     currentUser = JSON.parse(localStorage.getItem('edulearn_current_user'));
   }

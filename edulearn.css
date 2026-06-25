@@ -1132,3 +1132,94 @@ body.dark-theme .skeleton::after {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   pointer-events: none; z-index: 99999; display: none;
 }
+
+/* ── MOBILE RESPONSIVE OVERRIDES ── */
+@media(max-width:600px){
+  /* Top Nav Stacked */
+  .topnav {
+    padding: 8px 16px !important;
+    height: auto !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: space-between !important;
+  }
+  .nav-links {
+    width: 100% !important;
+    justify-content: center !important;
+    order: 3 !important;
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+    padding-top: 10px !important;
+    margin-top: 2px !important;
+    gap: 4px !important;
+  }
+  .nav-links a {
+    padding: 5px 10px !important;
+    font-size: 12.5px !important;
+  }
+  .nav-right {
+    order: 2 !important;
+  }
+  .brand {
+    order: 1 !important;
+  }
+  
+  /* Reduced padding for smaller screens */
+  .screen {
+    padding: 16px 12px !important;
+  }
+  .screen-tabs {
+    padding: 0 12px !important;
+  }
+  .tab {
+    padding: 12px 14px !important;
+    font-size: 12.5px !important;
+  }
+  
+  /* Hero section stacked */
+  .dash-hero {
+    flex-direction: column !important;
+    text-align: center !important;
+    padding: 20px !important;
+    gap: 16px !important;
+  }
+  .hero-progress {
+    width: 100% !important;
+    max-width: 220px !important;
+    padding: 12px !important;
+  }
+  
+  /* Stats stacked cleanly */
+  .stat-card {
+    min-width: 100% !important;
+  }
+  
+  /* Buttons and choice stacking */
+  .choices {
+    gap: 8px !important;
+  }
+  .choice {
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+  }
+  .btn-dl {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .sertif-actions {
+    flex-direction: column !important;
+  }
+  
+  /* Quiz question text */
+  .ujian-body {
+    padding: 18px 16px !important;
+  }
+  
+  /* Modal Card spacing */
+  .modal-backdrop {
+    padding: 10px !important;
+  }
+  .modal-card {
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+}
