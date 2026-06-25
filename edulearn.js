@@ -451,7 +451,7 @@ function processLogin() {
   saveAndRestart();
 }
 
-function processRegister() {
+async function processRegister() {
   const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const pass = document.getElementById('regPassword').value;
@@ -485,6 +485,9 @@ function processRegister() {
 
   allUsers.push(newUser);
   localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
+  
+  // Sync new user to Supabase to prevent loss on reload
+  await syncUserToSupabase(newUser);
   
   alert('Registrasi akun baru berhasil! Akun Anda membutuhkan verifikasi Admin sebelum dapat digunakan. Gunakan akun demo yang tersedia untuk menguji langsung.');
   switchAuthTab('login');
