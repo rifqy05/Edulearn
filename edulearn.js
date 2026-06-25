@@ -213,6 +213,10 @@ function saveDataToStorage() {
   localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
   localStorage.setItem('edulearn_forums', JSON.stringify(allForums));
   localStorage.setItem('edulearn_transactions', JSON.stringify(allTransactions));
+  
+  if (currentUser && typeof syncUserToSupabase === 'function') {
+    syncUserToSupabase(currentUser);
+  }
 }
 
 // NAVIGATION SYSTEM
@@ -519,9 +523,19 @@ document.addEventListener('click', (e) => {
   }
 });
 
-function handleRoleSwitch(newRole) {
+async function handleRoleSwitch(newRole) {
   currentUser.role = newRole;
   localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+  
+  const idx = allUsers.findIndex(u => u.id === currentUser.id);
+  if (idx !== -1) {
+    allUsers[idx].role = newRole;
+    localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
+  }
+  
+  if (typeof syncUserToSupabase === 'function') {
+    await syncUserToSupabase(currentUser);
+  }
   location.reload();
 }
 
@@ -539,7 +553,7 @@ function closeProfileSettings() {
   document.getElementById('profileSettingsModalBackdrop').classList.remove('show');
 }
 
-function saveProfileSettings() {
+async function saveProfileSettings() {
   const name = document.getElementById('profileNameInput').value.trim();
   const twoFa = document.getElementById('profile2faInput').checked;
   if (!name) {
@@ -556,6 +570,10 @@ function saveProfileSettings() {
   }
   
   saveDataToStorage();
+  
+  if (typeof syncUserToSupabase === 'function') {
+    await syncUserToSupabase(currentUser);
+  }
   location.reload();
 }
 
