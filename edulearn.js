@@ -849,9 +849,9 @@ function enrollCourseDirectly(courseId) {
       status: "SUCCESS"
     };
     allTransactions.unshift(trans);
-    
-    alert("Berhasil terdaftar ke kursus gratis!");
     saveDataToStorage();
+    syncTransactionToSupabase(trans);
+    
     renderCatalog();
     showScreenTab(0);
   }
@@ -936,6 +936,7 @@ function executePaymentSim(success) {
     
     allTransactions.unshift(transRecord);
     saveDataToStorage();
+    syncTransactionToSupabase(transRecord);
 
     if (success) {
       icon.textContent = '✅';
@@ -1281,6 +1282,7 @@ function submitForumComment() {
   
   allForums[courseId].push(newPost);
   saveDataToStorage();
+  syncForumPostToSupabase(newPost, courseId);
   renderForumDiscussion(courseId);
   input.value = '';
   
@@ -1295,6 +1297,7 @@ function submitForumComment() {
       };
       allForums[courseId].push(insReply);
       saveDataToStorage();
+      syncForumPostToSupabase(insReply, courseId);
       renderForumDiscussion(courseId);
     }, 1500);
   }
@@ -2028,6 +2031,7 @@ function submitCreateCourse() {
 
   allCourses.push(newCourse);
   saveDataToStorage();
+  syncCourseToSupabase(newCourse);
   closeCreateCourseModal();
   renderInstructorDashboard();
   alert("Sukses: Kursus baru dan set syllabus berhasil diterbitkan di sistem! (FR-07)");
@@ -2066,6 +2070,7 @@ function submitAddQuestion() {
     });
     
     saveDataToStorage();
+    syncCourseToSupabase(course);
     closeAddQuestionModal();
     loadQuestionsForInstructor(courseId);
     
@@ -2171,6 +2176,7 @@ function verifyUserAdmin(userId) {
   if (found) {
     found.status = "Aktif";
     saveDataToStorage();
+    syncUserToSupabase(found);
     renderAdminUserTable();
     alert(`Akun ${found.name} telah berhasil diverifikasi oleh Admin!`);
   }
@@ -2181,6 +2187,7 @@ function toggleUserStatus(userId) {
   if (found) {
     found.status = found.status === "Aktif" ? "Nonaktif" : "Aktif";
     saveDataToStorage();
+    syncUserToSupabase(found);
     renderAdminUserTable();
     alert(`Status akun ${found.name} berhasil diubah.`);
   }
@@ -2194,6 +2201,7 @@ function switchUserRoleAdmin(userId) {
     if (conf) {
       found.role = newRole;
       saveDataToStorage();
+      syncUserToSupabase(found);
       renderAdminUserTable();
       alert(`Hak akses akun ${found.name} berhasil diubah menjadi ${newRole}.`);
     }
@@ -2212,11 +2220,206 @@ function goToHome() {
   }
 }
 
-window.onload = function() {
+window.onload = async function() {
   loadDataFromStorage();
   initTheme();
+  await loadDataFromSupabase();
   checkAuthStatus();
 };
+
+// ── SUPABASE CLOUD POSTGRES INTEGRATION ──
+const SUPABASE_URL = 'https://yenrphiduusuvgpjcegf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllbnJwaGlkdXVzdXZncGpjZWdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzODA3ODAsImV4cCI6MjA5Nzk1Njc4MH0.D2ugq1BFwGhrqvWqB0rQu6Lo5Ay0QEeHrdGhVtyZhTo';
+const _supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+async function loadDataFromSupabase() {
+  if (!_supabase) return;
+  
+  try {
+    // 1. Fetch Users
+    const { data: users, error: errU } = await _supabase.from('users').select('*');
+    if (errU) throw errU;
+    if (users && users.length > 0) {
+      allUsers = users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        password: u.password,
+        role: u.role,
+        status: u.status,
+        twoFactor: u.two_factor,
+        enrolledCourses: typeof u.enrolled_courses === 'string' ? JSON.parse(u.enrolled_courses) : u.enrolled_courses,
+        completedLectures: typeof u.completed_lectures === 'string' ? JSON.parse(u.completed_lectures) : u.completed_lectures,
+        studyHours: u.study_hours,
+        certsCount: u.certs_count,
+        examAttempts: typeof u.exam_attempts === 'string' ? JSON.parse(u.exam_attempts) : u.exam_attempts,
+        examPassed: typeof u.exam_passed === 'string' ? JSON.parse(u.exam_passed) : u.exam_passed,
+        examScores: typeof u.exam_scores === 'string' ? JSON.parse(u.exam_scores) : u.exam_scores,
+        examHistory: typeof u.exam_history === 'string' ? JSON.parse(u.exam_history) : u.exam_history
+      }));
+      localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
+    }
+    
+    // 2. Fetch Courses
+    const { data: courses, error: errC } = await _supabase.from('courses').select('*');
+    if (errC) throw errC;
+    if (courses && courses.length > 0) {
+      allCourses = courses.map(c => ({
+        id: c.id,
+        title: c.title,
+        category: c.category,
+        instructor: c.instructor,
+        level: c.level,
+        rating: c.rating,
+        reviewsCount: c.reviews_count,
+        price: c.price,
+        duration: c.duration,
+        materiCount: c.materi_count,
+        enrolled: c.enrolled,
+        syllabus: typeof c.syllabus === 'string' ? JSON.parse(c.syllabus) : c.syllabus,
+        exams: typeof c.exams === 'string' ? JSON.parse(c.exams) : c.exams
+      }));
+      localStorage.setItem('edulearn_courses', JSON.stringify(allCourses));
+    }
+    
+    // 3. Fetch Forums
+    const { data: forums, error: errF } = await _supabase.from('forums').select('*').order('created_at', { ascending: true });
+    if (errF) throw errF;
+    if (forums) {
+      allForums = {};
+      forums.forEach(f => {
+        if (!allForums[f.course_id]) {
+          allForums[f.course_id] = [];
+        }
+        allForums[f.course_id].push({
+          id: f.id,
+          user: f.user_name,
+          avatar: f.avatar,
+          text: f.text,
+          time: f.time_label,
+          replies: typeof f.replies === 'string' ? JSON.parse(f.replies) : f.replies
+        });
+      });
+      localStorage.setItem('edulearn_forums', JSON.stringify(allForums));
+    }
+    
+    // 4. Fetch Transactions
+    const { data: trans, error: errT } = await _supabase.from('transactions').select('*').order('created_at', { ascending: false });
+    if (errT) throw errT;
+    if (trans) {
+      allTransactions = trans.map(t => ({
+        date: t.date,
+        user: t.user_name,
+        course: t.course,
+        method: t.method,
+        price: t.price,
+        status: t.status
+      }));
+      localStorage.setItem('edulearn_transactions', JSON.stringify(allTransactions));
+    }
+    
+    // 5. Restore current user session
+    const savedSession = localStorage.getItem('edulearn_current_user');
+    if (savedSession) {
+      const savedUser = JSON.parse(savedSession);
+      const latestUser = allUsers.find(u => u.id === savedUser.id);
+      if (latestUser) {
+        currentUser = latestUser;
+        localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+      }
+    }
+    
+    showToast("Database Terkoneksi", "Berhasil menyinkronkan data secara real-time dengan PostgreSQL Supabase.", "success");
+  } catch (error) {
+    console.error("Supabase load error:", error);
+    showToast("Supabase Mode Offline", "Gagal menghubungi database cloud, menggunakan data lokal sementara.", "warning");
+  }
+}
+
+async function syncUserToSupabase(u) {
+  if (!_supabase) return;
+  try {
+    const { error } = await _supabase.from('users').upsert({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      password: u.password,
+      role: u.role,
+      status: u.status,
+      two_factor: u.twoFactor || false,
+      enrolled_courses: u.enrolledCourses || [],
+      completed_lectures: u.completedLectures || {},
+      study_hours: u.studyHours || 0,
+      certs_count: u.certsCount || 0,
+      exam_attempts: u.examAttempts || {},
+      exam_passed: u.examPassed || {},
+      exam_scores: u.examScores || {},
+      exam_history: u.examHistory || []
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("Sync user failed:", err);
+  }
+}
+
+async function syncCourseToSupabase(c) {
+  if (!_supabase) return;
+  try {
+    const { error } = await _supabase.from('courses').upsert({
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      instructor: c.instructor,
+      level: c.level,
+      rating: c.rating || 4.5,
+      reviews_count: c.reviewsCount || '0',
+      price: c.price || 0,
+      duration: c.duration || 0,
+      materi_count: c.materiCount || 0,
+      enrolled: c.enrolled || false,
+      syllabus: c.syllabus || [],
+      exams: c.exams || {}
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("Sync course failed:", err);
+  }
+}
+
+async function syncForumPostToSupabase(p, courseId) {
+  if (!_supabase) return;
+  try {
+    const { error } = await _supabase.from('forums').upsert({
+      id: p.id,
+      course_id: courseId,
+      user_name: p.user,
+      avatar: p.avatar,
+      text: p.text,
+      time_label: p.time,
+      replies: p.replies || []
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("Sync forum failed:", err);
+  }
+}
+
+async function syncTransactionToSupabase(t) {
+  if (!_supabase) return;
+  try {
+    const { error } = await _supabase.from('transactions').insert({
+      date: t.date,
+      user_name: t.user,
+      course: t.course,
+      method: t.method,
+      price: t.price,
+      status: t.status
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("Sync transaction failed:", err);
+  }
+}
 
 // ── CUSTOM TOAST NOTIFICATION SYSTEM ──
 function showToast(title, message, type = 'info') {
