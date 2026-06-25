@@ -169,7 +169,7 @@
   SCREEN 3 — UJIAN ONLINE
 ══════════════════════════════════════════ -->
 <div class="screen" id="s2">
-  <div id="noActiveExamView" style="text-align: center; padding: 48px; background: #fff; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow);">
+  <div id="noActiveExamView" style="text-align: center; padding: 48px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow);">
     <span style="font-size: 48px;">📝</span>
     <h3 style="margin-top: 14px; font-size: 18px;">Tidak Ada Ujian Berjalan</h3>
     <p style="color: var(--sub); font-size: 13px; margin: 8px 0 18px;">Pilih ujian dari Dashboard atau dari halaman materi kursus untuk memulai.</p>
@@ -219,7 +219,7 @@
             <div style="width:12px;height:12px;border-radius:3px;background:var(--navy)"></div>Sedang dikerjakan
           </div>
           <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub)">
-            <div style="width:12px;height:12px;border-radius:3px;background:#fff;border:1.5px solid #ddd"></div>Belum dijawab
+            <div class="sdot-legend-unanswered" style="width:12px;height:12px;border-radius:3px;background:#fff;border:1.5px solid #ddd"></div>Belum dijawab
           </div>
         </div>
       </div>
@@ -231,7 +231,7 @@
   SCREEN 4 — HASIL & SERTIFIKAT
 ══════════════════════════════════════════ -->
 <div class="screen" id="s3">
-  <div id="noHasilView" style="text-align: center; padding: 48px; background: #fff; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow);">
+  <div id="noHasilView" style="text-align: center; padding: 48px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow);">
     <span style="font-size: 48px;">🏆</span>
     <h3 style="margin-top: 14px; font-size: 18px;">Belum Ada Hasil Ujian</h3>
     <p style="color: var(--sub); font-size: 13px; margin: 8px 0 18px;">Selesaikan salah satu ujian untuk melihat hasil dan mendownload sertifikat.</p>
@@ -957,7 +957,7 @@ print(x) (kosongkan jika tidak perlu)"></textarea>
       </div>
       <div class="form-group">
         <label for="profileEmailInput">Alamat Email:</label>
-        <input type="email" id="profileEmailInput" disabled style="background:#eee; cursor:not-allowed;">
+        <input type="email" id="profileEmailInput" disabled>
       </div>
       <div class="form-group">
         <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;">

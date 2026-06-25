@@ -750,6 +750,7 @@ h1,h2,h3,.brand-name { font-family:'Poppins',sans-serif; }
 .admin-table-card {
   background: #fff; border-radius: var(--radius); border: 1px solid var(--border);
   box-shadow: var(--shadow); padding: 18px 24px; margin-bottom: 20px;
+  overflow-x: auto;
 }
 .admin-table-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
 
@@ -789,6 +790,10 @@ table.admin-table tr:last-child td { border-bottom: none; }
   outline: none; font-family: inherit; font-size: 13px;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--navy); }
+input:disabled, select:disabled, textarea:disabled {
+  background: #eee;
+  cursor: not-allowed;
+}
 .form-row { display: flex; gap: 10px; }
 .form-row .form-group { flex: 1; }
 
@@ -1047,6 +1052,97 @@ body.dark-theme .btn-dl.secondary {
   color: var(--navy-l) !important;
   border-color: var(--navy-l) !important;
 }
+body.dark-theme .course-tag {
+  background: rgba(99, 102, 241, 0.2) !important;
+  color: var(--navy-l) !important;
+}
+
+body.dark-theme .prog-bar,
+body.dark-theme .score-bar {
+  background: #334155 !important;
+}
+
+body.dark-theme #noActiveExamView,
+body.dark-theme #noHasilView {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+body.dark-theme .sdot-legend-unanswered {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+body.dark-theme .cw-box.g {
+  background: #064E3B !important;
+}
+
+body.dark-theme .cw-box.r {
+  background: #7F1D1D !important;
+}
+
+body.dark-theme .sertif-card {
+  background: linear-gradient(135deg, #78350F, #451A03) !important;
+  border-color: #F59E0B !important;
+}
+
+body.dark-theme .sertif-info h4 {
+  color: #FFFDE7 !important;
+}
+
+body.dark-theme .sertif-info .sertif-id {
+  color: #F59E0B !important;
+}
+
+body.dark-theme .choice-radio {
+  background: var(--bg) !important;
+  border-color: var(--border) !important;
+}
+
+body.dark-theme .choice.selected .choice-radio {
+  background: var(--green) !important;
+  border-color: var(--green) !important;
+}
+
+body.dark-theme #profileEmailInput {
+  background: #334155 !important;
+  color: var(--sub) !important;
+}
+
+body.dark-theme input::placeholder,
+body.dark-theme textarea::placeholder {
+  color: #475569 !important;
+}
+
+body.dark-theme .player-tab-panel a {
+  color: var(--navy-l) !important;
+}
+
+body.dark-theme .btn-green-sim {
+  background: #064E3B !important;
+  color: #34D399 !important;
+  border-color: #059669 !important;
+}
+
+body.dark-theme .btn-locked-sim {
+  background: #334155 !important;
+  color: #64748B !important;
+}
+
+body.dark-theme #hasilActionRetryBtnWrap button[disabled] {
+  background: #334155 !important;
+  color: #64748B !important;
+}
+
+body.dark-theme .prog-fill.purple {
+  background: #A78BFA !important;
+}
+
+body.dark-theme .course-card.purple-top {
+  border-top-color: #A78BFA !important;
+}
+
 body.dark-theme .btn-dl.secondary:hover {
   background: rgba(99, 102, 241, 0.1) !important;
 }
@@ -1221,5 +1317,10 @@ body.dark-theme .skeleton::after {
   .modal-card {
     max-height: 90vh !important;
     overflow-y: auto !important;
+  }
+  
+  /* Stack catalog grid layout on mobile */
+  .katalog-grid {
+    grid-template-columns: 1fr !important;
   }
 }

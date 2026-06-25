@@ -188,9 +188,17 @@ function loadDataFromStorage() {
     ]));
     localStorage.setItem('edulearn_seeded', 'true');
     
+    localStorage.removeItem('edulearn_current_user');
+    localStorage.removeItem('edulearn_explicit_login');
     currentUser = null;
   } else {
-    currentUser = JSON.parse(localStorage.getItem('edulearn_current_user'));
+    const savedUser = JSON.parse(localStorage.getItem('edulearn_current_user') || 'null');
+    if (savedUser && savedUser.id === 'usr-01' && !localStorage.getItem('edulearn_explicit_login')) {
+      localStorage.removeItem('edulearn_current_user');
+      currentUser = null;
+    } else {
+      currentUser = savedUser;
+    }
   }
   
   allCourses = JSON.parse(localStorage.getItem('edulearn_courses'));
@@ -485,11 +493,13 @@ function processRegister() {
 function handleLogout() {
   currentUser = null;
   localStorage.removeItem('edulearn_current_user');
+  localStorage.removeItem('edulearn_explicit_login');
   location.reload();
 }
 
 function saveAndRestart() {
   localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+  localStorage.setItem('edulearn_explicit_login', 'true');
   location.reload();
 }
 
@@ -602,7 +612,7 @@ function renderStudentDashboard() {
   
   if (currentUser.enrolledCourses.length === 0) {
     grid.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 28px; background: #fff; border-radius: var(--radius); border: 1px solid var(--border);">
+      <div style="grid-column: 1/-1; text-align: center; padding: 28px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);">
         <p style="color:var(--sub)">Anda belum mendaftar di kursus apa pun. Jelajahi katalog dan temukan kursus.</p>
       </div>
     `;
@@ -658,7 +668,7 @@ function renderStudentDashboard() {
       const attempts = currentUser.examAttempts[exam.id] || 0;
       
       const card = document.createElement('div');
-      card.style.cssText = "background:#fff; border-radius:var(--radius); padding:16px 20px; box-shadow:var(--shadow); border:1px solid var(--border); display:flex; align-items:center; gap:14px;";
+      card.style.cssText = "background:var(--card); border-radius:var(--radius); padding:16px 20px; box-shadow:var(--shadow); border:1px solid var(--border); display:flex; align-items:center; gap:14px;";
       
       let badge = '📝';
       let statText = `${exam.duration} menit · ${exam.questions.length} soal (KKM: ${exam.kkm})`;
@@ -667,20 +677,20 @@ function renderStudentDashboard() {
       if (passed) {
         badge = '✅';
         statText = `Lulus dengan nilai ${score}/100! (Percobaan: ${attempts})`;
-        btnHtml = `<button onclick="viewPassedExamResult('${exam.id}')" style="margin-left:auto; padding:7px 14px; background:#E8F8EF; color:var(--green); border:1px solid var(--green); border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">Lihat Hasil</button>`;
+        btnHtml = `<button class="btn-green-sim" onclick="viewPassedExamResult('${exam.id}')" style="margin-left:auto; padding:7px 14px; background:#E8F8EF; color:var(--green); border:1px solid var(--green); border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">Lihat Hasil</button>`;
       } else if (attempts > 0) {
         badge = attempts >= 3 ? '🔒' : '⏳';
         statText = `Percobaan: ${attempts}/3. Nilai terakhir: ${score}`;
         
         if (attempts >= 3) {
-          btnHtml = `<button disabled style="margin-left:auto; padding:7px 14px; background:#eee; color:#aaa; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:not-allowed;">Terkunci</button>`;
+          btnHtml = `<button class="btn-locked-sim" disabled style="margin-left:auto; padding:7px 14px; background:#eee; color:#aaa; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:not-allowed;">Terkunci</button>`;
         } else {
           btnHtml = `<button onclick="startExamFlow('${course.id}')" style="margin-left:auto; padding:7px 14px; background:var(--orange); color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">Coba Ulang</button>`;
         }
       }
       
       card.innerHTML = `
-        <div style="width:44px; height:44px; background:#FEF3E7; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px;">${badge}</div>
+        <div style="width:44px; height:44px; background:var(--bg); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px;">${badge}</div>
         <div>
           <div style="font-weight:600; font-size:14px;">${exam.title}</div>
           <div style="font-size:12px; color:var(--sub); margin-top:2px;">${statText}</div>
@@ -749,7 +759,7 @@ function renderCatalog() {
 
   if (filtered.length === 0) {
     grid.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 48px; background: #fff; border-radius: var(--radius); border: 1px solid var(--border);">
+      <div style="grid-column: 1/-1; text-align: center; padding: 48px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);">
         <p style="color:var(--sub); font-size: 14px;">Tidak ada kursus yang cocok dengan kriteria pencarian.</p>
       </div>
     `;
