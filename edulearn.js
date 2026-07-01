@@ -169,6 +169,11 @@ let currentVideoInterval = null;
 
 // INITIAL LOAD
 function loadDataFromStorage() {
+  // Migration: Clear old localStorage session key to prevent legacy auto-login
+  if (localStorage.getItem('edulearn_current_user')) {
+    localStorage.removeItem('edulearn_current_user');
+  }
+
   // Safeguard: Reset seed if the browser has old storage without default test accounts
   if (localStorage.getItem('edulearn_seeded')) {
     const tempUsers = JSON.parse(localStorage.getItem('edulearn_users') || '[]');
@@ -492,11 +497,17 @@ function processLogin() {
   }
   
   if (is2FA || found.twoFactor) {
-    const code = prompt("2FA Keamanan Ganda (FR-02) Aktif.\nSebuah SMS/Email OTP dikirim. Harap masukkan 6 digit kode OTP (Gunakan: 123456):");
-    if (code !== "123456") {
-      alert("Kode OTP salah! Gagal melakukan autentikasi.");
-      return;
-    }
+    pendingLoginUser = found;
+    // Clear previous OTP inputs
+    const inputs = document.querySelectorAll('#otpInputGroup input');
+    inputs.forEach(input => input.value = "");
+    // Open the custom OTP modal
+    document.getElementById('otpModalBackdrop').classList.add('show');
+    // Focus the first input box
+    setTimeout(() => {
+      if (inputs[0]) inputs[0].focus();
+    }, 100);
+    return;
   }
 
   currentUser = found;
@@ -506,9 +517,9 @@ function processLogin() {
   sessionStorage.setItem('edulearn_session_id', sessionId);
 
   if (!currentUser.enrolledCourses) {
-    currentUser.enrolledCourses = ["py-1"];
-    currentUser.completedLectures = { "py-1": ["py-1-1", "py-1-2"] };
-    currentUser.studyHours = 10;
+    currentUser.enrolledCourses = [];
+    currentUser.completedLectures = {};
+    currentUser.studyHours = 0;
     currentUser.certsCount = 0;
     currentUser.examAttempts = {};
     currentUser.examPassed = {};
@@ -671,12 +682,23 @@ function renderStudentDashboard() {
 
   let totalSyllabusChapters = 0;
   let completedSyllabusChapters = 0;
+  let totalCompletedMinutes = 0;
+  
   currentUser.enrolledCourses.forEach(cId => {
     const course = allCourses.find(c => c.id === cId);
     if (course) {
       totalSyllabusChapters += course.syllabus.length;
       const completedList = currentUser.completedLectures[cId] || [];
       completedSyllabusChapters += completedList.length;
+      
+      course.syllabus.forEach(lec => {
+        if (completedList.includes(lec.id)) {
+          const match = lec.duration.match(/(\d+)/);
+          if (match) {
+            totalCompletedMinutes += parseInt(match[1], 10);
+          }
+        }
+      });
     }
   });
   
@@ -687,8 +709,8 @@ function renderStudentDashboard() {
   document.getElementById('statActiveCourses').textContent = activeCount;
   document.getElementById('statPendingExams').textContent = pendingExams;
   
-  const calcHours = 10 + (completedSyllabusChapters * 2.5);
-  currentUser.studyHours = Math.round(calcHours);
+  const calcHours = totalCompletedMinutes / 60;
+  currentUser.studyHours = parseFloat(calcHours.toFixed(1));
   document.getElementById('statStudyHours').textContent = `${currentUser.studyHours} jam`;
   sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
 
@@ -2829,3 +2851,71 @@ function updateLastActive() {
 ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
   window.addEventListener(evt, updateLastActive, { passive: true });
 });
+
+// ── 2FA CUSTOM OTP MODAL LOGIC ──
+let pendingLoginUser = null;
+
+function moveOtpFocus(el, index) {
+  if (el.value.length === 1 && index < 6) {
+    const inputs = document.querySelectorAll('#otpInputGroup input');
+    if (inputs[index]) inputs[index].focus();
+  }
+}
+
+function handleOtpBackspace(el, event) {
+  if (event.key === "Backspace" && el.value.length === 0) {
+    const inputs = document.querySelectorAll('#otpInputGroup input');
+    for (let i = 1; i < inputs.length; i++) {
+      if (inputs[i] === el) {
+        inputs[i - 1].focus();
+        break;
+      }
+    }
+  }
+}
+
+function cancelOtpVerification() {
+  document.getElementById('otpModalBackdrop').classList.remove('show');
+  pendingLoginUser = null;
+}
+
+function submitOtpVerification() {
+  const inputs = document.querySelectorAll('#otpInputGroup input');
+  let enteredCode = "";
+  inputs.forEach(input => enteredCode += input.value);
+  
+  if (enteredCode !== "123456") {
+    alert("Kode OTP salah! Gagal melakukan autentikasi.");
+    inputs.forEach(input => input.value = "");
+    inputs[0].focus();
+    return;
+  }
+  
+  // Successful OTP!
+  document.getElementById('otpModalBackdrop').classList.remove('show');
+  
+  currentUser = pendingLoginUser;
+  pendingLoginUser = null;
+  
+  // Generate session ID
+  const sessionId = "sess-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+  sessionStorage.setItem('edulearn_session_id', sessionId);
+
+  if (!currentUser.enrolledCourses) {
+    currentUser.enrolledCourses = [];
+    currentUser.completedLectures = {};
+    currentUser.studyHours = 0;
+    currentUser.certsCount = 0;
+    currentUser.examAttempts = {};
+    currentUser.examPassed = {};
+    currentUser.examScores = {};
+    currentUser.examHistory = [];
+  }
+
+  if (!currentUser.completedLectures) {
+    currentUser.completedLectures = {};
+  }
+  currentUser.completedLectures.active_session = sessionId;
+
+  saveAndRestart();
+}

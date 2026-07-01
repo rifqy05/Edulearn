@@ -632,6 +632,39 @@ print(x)
   MODALS SECTION
 ══════════════════════════════════════════ -->
 
+<!-- MODAL: 2FA OTP VERIFICATION -->
+<div class="modal-backdrop" id="otpModalBackdrop">
+  <div class="modal-card" style="max-width: 360px; text-align: center;">
+    <div class="modal-header" style="justify-content: center; border-bottom: none; padding-bottom: 0;">
+      <h3 style="font-size: 20px; font-weight: 700; color: var(--navy);">Verifikasi Keamanan Ganda (2FA)</h3>
+    </div>
+    <div class="modal-body" style="padding-top: 10px;">
+      <p style="font-size: 13px; color: var(--sub); margin-bottom: 20px;">
+        Kode OTP telah dikirim melalui SMS/Email.<br>Silakan masukkan 6 digit kode keamanan di bawah ini:
+      </p>
+      
+      <!-- OTP Input Boxes -->
+      <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 24px;" id="otpInputGroup">
+        <input type="text" maxlength="1" style="width: 40px; height: 48px; text-align: center; font-size: 20px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);" oninput="moveOtpFocus(this, 1)" onkeydown="handleOtpBackspace(this, event)">
+        <input type="text" maxlength="1" style="width: 40px; height: 48px; text-align: center; font-size: 20px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);" oninput="moveOtpFocus(this, 2)" onkeydown="handleOtpBackspace(this, event)">
+        <input type="text" maxlength="1" style="width: 40px; height: 48px; text-align: center; font-size: 20px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);" oninput="moveOtpFocus(this, 3)" onkeydown="handleOtpBackspace(this, event)">
+        <input type="text" maxlength="1" style="width: 40px; height: 48px; text-align: center; font-size: 20px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);" oninput="moveOtpFocus(this, 4)" onkeydown="handleOtpBackspace(this, event)">
+        <input type="text" maxlength="1" style="width: 40px; height: 48px; text-align: center; font-size: 20px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);" oninput="moveOtpFocus(this, 5)" onkeydown="handleOtpBackspace(this, event)">
+        <input type="text" maxlength="1" style="width: 40px; height: 48px; text-align: center; font-size: 20px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);" oninput="moveOtpFocus(this, 6)" onkeydown="handleOtpBackspace(this, event)">
+      </div>
+      
+      <p style="font-size: 11px; color: var(--sub); margin-bottom: 20px; background: var(--bg); padding: 8px 12px; border-radius: 6px; display: inline-block;">
+        💡 Petunjuk Demo: Gunakan kode <strong>123456</strong> untuk berhasil.
+      </p>
+      
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-continue" style="flex: 1; background: #666;" onclick="cancelOtpVerification()">Batal</button>
+        <button class="btn-continue" style="flex: 1;" onclick="submitOtpVerification()">Verifikasi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL 1: AUTHENTICATION (LOGIN / REGISTER) -->
 <div class="modal-backdrop" id="authModalBackdrop">
   <div class="modal-card" style="max-width: 400px;">
