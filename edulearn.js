@@ -2261,6 +2261,11 @@ function submitAddQuestion() {
 //  ADMIN CODE & TRANSACTIONS (FR-14, FR-15)
 // ══════════════════════════════════════════
 function renderAdminDashboard() {
+  // Clear search input on dashboard load to prevent browser auto-fill issues
+  const searchInput = document.getElementById('adminUserSearchInput');
+  if (searchInput) {
+    searchInput.value = '';
+  }
   let totalEarnings = 0;
   
   document.getElementById('admTotalUsers').textContent = allUsers.length;
@@ -2319,11 +2324,15 @@ function renderAdminUserTable() {
     
     let actionsHtml = "";
     if (u.status === "Pending") {
-      actionsHtml = `<button class="btn-action primary" onclick="verifyUserAdmin('${u.id}')">Verifikasi Akun</button>`;
+      actionsHtml = `
+        <button class="btn-action primary" onclick="verifyUserAdmin('${u.id}')">Verifikasi Akun</button>
+        <button class="btn-action danger" onclick="deleteUserAdmin('${u.id}')">Hapus</button>
+      `;
     } else {
       actionsHtml = `
         <button class="btn-action" onclick="toggleUserStatus('${u.id}')">${u.status === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan'}</button>
         <button class="btn-action" onclick="switchUserRoleAdmin('${u.id}')">Ubah Peran</button>
+        <button class="btn-action danger" onclick="deleteUserAdmin('${u.id}')">Hapus</button>
       `;
     }
 
@@ -2384,6 +2393,34 @@ function switchUserRoleAdmin(userId) {
       renderAdminUserTable();
       alert(`Hak akses akun ${found.name} berhasil diubah menjadi ${newRole}.`);
     }
+  }
+}
+
+function deleteUserAdmin(userId) {
+  if (currentUser && currentUser.id === userId) {
+    alert("Kunci Keamanan: Anda tidak dapat menghapus akun Anda sendiri!");
+    return;
+  }
+  const found = allUsers.find(u => u.id === userId);
+  if (found) {
+    const conf = confirm(`Apakah Anda yakin ingin menghapus akun ${found.name} secara permanen? Tindakan ini akan menghapus data akun dari database cloud Supabase dan tidak bisa dibatalkan.`);
+    if (conf) {
+      allUsers = allUsers.filter(u => u.id !== userId);
+      saveDataToStorage();
+      deleteUserFromSupabase(userId);
+      renderAdminUserTable();
+      alert(`Akun ${found.name} telah berhasil dihapus dari sistem.`);
+    }
+  }
+}
+
+async function deleteUserFromSupabase(userId) {
+  if (!_supabase) return;
+  try {
+    const { error } = await _supabase.from('users').delete().eq('id', userId);
+    if (error) throw error;
+  } catch (err) {
+    console.error("Delete user from Supabase failed:", err);
   }
 }
 
