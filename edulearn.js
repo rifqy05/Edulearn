@@ -188,16 +188,30 @@ function loadDataFromStorage() {
     ]));
     localStorage.setItem('edulearn_seeded', 'true');
     
-    localStorage.removeItem('edulearn_current_user');
+    sessionStorage.removeItem('edulearn_current_user');
     localStorage.removeItem('edulearn_explicit_login');
     currentUser = null;
   } else {
-    const savedUser = JSON.parse(localStorage.getItem('edulearn_current_user') || 'null');
+    const savedUser = JSON.parse(sessionStorage.getItem('edulearn_current_user') || 'null');
     if (savedUser && savedUser.id === 'usr-01' && !localStorage.getItem('edulearn_explicit_login')) {
-      localStorage.removeItem('edulearn_current_user');
+      sessionStorage.removeItem('edulearn_current_user');
       currentUser = null;
     } else {
       currentUser = savedUser;
+      
+      // Check session expiry on startup (5 minutes)
+      const lastActiveStr = localStorage.getItem('edulearn_last_active');
+      if (lastActiveStr && currentUser) {
+        const lastActive = parseInt(lastActiveStr, 10);
+        const now = Date.now();
+        const idleLimit = 5 * 60 * 1000; // 5 minutes
+        if (now - lastActive > idleLimit) {
+          sessionStorage.removeItem('edulearn_current_user');
+          localStorage.removeItem('edulearn_explicit_login');
+          currentUser = null;
+          localStorage.setItem('edulearn_session_expired_flag', 'true');
+        }
+      }
     }
   }
   
@@ -208,7 +222,7 @@ function loadDataFromStorage() {
 }
 
 function saveDataToStorage() {
-  localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+  sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
   localStorage.setItem('edulearn_courses', JSON.stringify(allCourses));
   localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
   localStorage.setItem('edulearn_forums', JSON.stringify(allForums));
@@ -270,7 +284,6 @@ function buildNavigationUI() {
   document.getElementById('dropdownUserRole').textContent = currentUser.role;
   document.getElementById('userAvatar').textContent = getAvatarInitials(currentUser.name);
   document.getElementById('userNameDisplay').textContent = currentUser.name;
-  document.getElementById('roleSwitcher').value = currentUser.role;
 }
 
 function handleTopNavLinkClick(type, screenIdx) {
@@ -348,27 +361,48 @@ function showScreenTab(screenIdx) {
     if (firstLink) firstLink.classList.add('active');
   }
   
-  if (screenIdx === 0 && currentUser.role === "Siswa") {
-    renderStudentDashboard();
-  } else if (screenIdx === 1 && currentUser.role === "Siswa") {
-    triggerCatalogShimmer();
-  } else if (screenIdx === 2 && currentUser.role === "Siswa") {
-    initUjianScreenView();
-  } else if (screenIdx === 3 && currentUser.role === "Siswa") {
-    initHasilScreenView();
-  } else if (screenIdx === 5 && currentUser.role === "Instruktur") {
-    renderInstructorDashboard();
-  } else if (screenIdx === 6 && currentUser.role === "Admin") {
-    renderAdminDashboard();
+  if (currentUser) {
+    if (screenIdx === 0 && currentUser.role === "Siswa") {
+      renderStudentDashboard();
+    } else if (screenIdx === 1 && currentUser.role === "Siswa") {
+      triggerCatalogShimmer();
+    } else if (screenIdx === 2 && currentUser.role === "Siswa") {
+      initUjianScreenView();
+    } else if (screenIdx === 3 && currentUser.role === "Siswa") {
+      initHasilScreenView();
+    } else if (screenIdx === 5 && currentUser.role === "Instruktur") {
+      renderInstructorDashboard();
+    } else if (screenIdx === 6 && currentUser.role === "Admin") {
+      renderAdminDashboard();
+    }
   }
 }
 
 // AUTH
 function checkAuthStatus() {
+  if (localStorage.getItem('edulearn_session_expired_flag')) {
+    localStorage.removeItem('edulearn_session_expired_flag');
+    alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama lebih dari 5 menit.");
+    handleLogout();
+    return;
+  }
+
   if (!currentUser) {
     document.getElementById('authModalBackdrop').classList.add('show');
     switchAuthTab('login');
   } else {
+    // Enforce status checks
+    if (currentUser.status === "Pending") {
+      alert("Akses ditolak: Akun Anda belum diverifikasi oleh Admin!");
+      handleLogout();
+      return;
+    }
+    if (currentUser.status === "Nonaktif") {
+      alert("Akses ditolak: Akun Anda telah dinonaktifkan oleh Admin!");
+      handleLogout();
+      return;
+    }
+
     document.getElementById('authModalBackdrop').classList.remove('show');
     buildNavigationUI();
     if (currentUser.role === "Siswa") {
@@ -420,15 +454,41 @@ function processLogin() {
     return;
   }
 
-  if (!email || !pass) {
-    alert('Harap isi alamat email dan password!');
+  if (!email && !pass) {
+    alert('Username & Password harus diisi');
+    return;
+  }
+  if (!email) {
+    alert('Username harus diisi');
+    return;
+  }
+  if (!pass) {
+    alert('Password harus diisi');
     return;
   }
 
   const found = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (!found || found.password !== pass) {
-    alert('Email atau Password tidak valid!');
+    alert('Username & Password tidak sesuai');
     return;
+  }
+  
+  if (found.status === "Pending") {
+    alert("Gagal masuk: Akun Anda belum diverifikasi oleh Admin!");
+    return;
+  }
+  if (found.status === "Nonaktif") {
+    alert("Gagal masuk: Akun Anda dinonaktifkan oleh Admin!");
+    return;
+  }
+  
+  // Double Login Check
+  const dbSessionId = found.completedLectures ? found.completedLectures.active_session : null;
+  if (dbSessionId) {
+    const confirmForce = confirm("Peringatan: Akun ini sedang aktif di perangkat/browser lain.\nApakah Anda ingin mengeluarkan sesi lain dan masuk?");
+    if (!confirmForce) {
+      return;
+    }
   }
   
   if (is2FA || found.twoFactor) {
@@ -441,6 +501,10 @@ function processLogin() {
 
   currentUser = found;
   
+  // Generate session ID
+  const sessionId = "sess-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+  sessionStorage.setItem('edulearn_session_id', sessionId);
+
   if (!currentUser.enrolledCourses) {
     currentUser.enrolledCourses = ["py-1"];
     currentUser.completedLectures = { "py-1": ["py-1-1", "py-1-2"] };
@@ -451,6 +515,11 @@ function processLogin() {
     currentUser.examScores = {};
     currentUser.examHistory = [];
   }
+
+  if (!currentUser.completedLectures) {
+    currentUser.completedLectures = {};
+  }
+  currentUser.completedLectures.active_session = sessionId;
 
   saveAndRestart();
 }
@@ -497,16 +566,27 @@ async function processRegister() {
   switchAuthTab('login');
 }
 
-function handleLogout() {
+async function handleLogout() {
+  if (currentUser) {
+    if (!currentUser.completedLectures) {
+      currentUser.completedLectures = {};
+    }
+    currentUser.completedLectures.active_session = null;
+    if (typeof syncUserToSupabase === 'function') {
+      await syncUserToSupabase(currentUser);
+    }
+  }
   currentUser = null;
-  localStorage.removeItem('edulearn_current_user');
+  sessionStorage.removeItem('edulearn_current_user');
   localStorage.removeItem('edulearn_explicit_login');
+  sessionStorage.removeItem('edulearn_session_id');
   location.reload();
 }
 
 function saveAndRestart() {
-  localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+  sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
   localStorage.setItem('edulearn_explicit_login', 'true');
+  localStorage.setItem('edulearn_last_active', Date.now().toString());
   location.reload();
 }
 
@@ -522,22 +602,6 @@ document.addEventListener('click', (e) => {
     dropdown.classList.remove('show');
   }
 });
-
-async function handleRoleSwitch(newRole) {
-  currentUser.role = newRole;
-  localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
-  
-  const idx = allUsers.findIndex(u => u.id === currentUser.id);
-  if (idx !== -1) {
-    allUsers[idx].role = newRole;
-    localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
-  }
-  
-  if (typeof syncUserToSupabase === 'function') {
-    await syncUserToSupabase(currentUser);
-  }
-  location.reload();
-}
 
 function openProfileSettings() {
   const dropdown = document.getElementById('profileDropdown');
@@ -626,7 +690,7 @@ function renderStudentDashboard() {
   const calcHours = 10 + (completedSyllabusChapters * 2.5);
   currentUser.studyHours = Math.round(calcHours);
   document.getElementById('statStudyHours').textContent = `${currentUser.studyHours} jam`;
-  localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+  sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
 
   const grid = document.getElementById('enrolledCoursesGrid');
   grid.innerHTML = '';
@@ -781,14 +845,14 @@ function renderCatalog() {
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 48px; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border);">
-        <p style="color:var(--sub); font-size: 14px;">Tidak ada kursus yang cocok dengan kriteria pencarian.</p>
+        <p style="color:var(--sub); font-size: 14px; font-weight: 500;">Kursus tidak ditemukan</p>
       </div>
     `;
     return;
   }
 
   filtered.forEach((c, idx) => {
-    const isEnrolled = currentUser.enrolledCourses.includes(c.id);
+    const isEnrolled = currentUser ? currentUser.enrolledCourses.includes(c.id) : false;
     const colorClasses = ['navy', 'green', 'purple', 'orange'];
     const hClass = colorClasses[idx % 4];
     
@@ -856,6 +920,11 @@ function handleSearchFilter() {
 }
 
 function enrollCourseDirectly(courseId) {
+  if (!currentUser) {
+    alert("Anda harus login terlebih dahulu!");
+    checkAuthStatus();
+    return;
+  }
   if (!currentUser.enrolledCourses.includes(courseId)) {
     currentUser.enrolledCourses.push(courseId);
     currentUser.completedLectures[courseId] = []; 
@@ -886,6 +955,7 @@ let activePaymentMethod = 'gopay';
 function triggerPaymentEnroll(courseId) {
   if (!currentUser) {
     alert("Anda harus login terlebih dahulu!");
+    checkAuthStatus();
     return;
   }
   
@@ -998,7 +1068,11 @@ let activePlayerLectureIndex = 0;
 
 function openCoursePlayer(courseId) {
   const course = allCourses.find(c => c.id === courseId);
-  if (!course) return;
+  if (!course) {
+    alert("Error 404: Kursus tidak ditemukan!");
+    showScreenTab(0);
+    return;
+  }
   
   activePlayerCourse = course;
   activePlayerLectureIndex = 0;
@@ -2341,13 +2415,33 @@ async function loadDataFromSupabase() {
     }
     
     // 5. Restore current user session
-    const savedSession = localStorage.getItem('edulearn_current_user');
+    const savedSession = sessionStorage.getItem('edulearn_current_user');
     if (savedSession) {
       const savedUser = JSON.parse(savedSession);
       const latestUser = allUsers.find(u => u.id === savedUser.id);
       if (latestUser) {
         currentUser = latestUser;
-        localStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+        sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+        
+        // Double login session check
+        const localSessionId = sessionStorage.getItem('edulearn_session_id');
+        const dbSessionId = currentUser.completedLectures ? currentUser.completedLectures.active_session : null;
+        
+        if (!dbSessionId) {
+          // If no session exists in DB, generate and set one
+          const sessionId = "sess-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+          if (!currentUser.completedLectures) currentUser.completedLectures = {};
+          currentUser.completedLectures.active_session = sessionId;
+          sessionStorage.setItem('edulearn_session_id', sessionId);
+          saveDataToStorage();
+        } else if (!localSessionId) {
+          // First time opening the tab, inherit the active session
+          sessionStorage.setItem('edulearn_session_id', dbSessionId);
+        } else if (dbSessionId !== localSessionId) {
+          alert("Sesi berakhir: Akun Anda telah masuk di perangkat atau browser lain!");
+          handleLogout();
+          return;
+        }
       }
     }
     
@@ -2681,3 +2775,57 @@ function renderFinancialChart() {
     }, 50);
   });
 }
+
+// ── DOUBLE LOGIN, STATUS & TIMEOUT HEARTBEAT CHECK ──
+setInterval(async () => {
+  if (currentUser) {
+    // 1. Local session timeout check (5 minutes)
+    const lastActiveStr = localStorage.getItem('edulearn_last_active');
+    if (lastActiveStr) {
+      const lastActive = parseInt(lastActiveStr, 10);
+      const now = Date.now();
+      const idleLimit = 5 * 60 * 1000; // 5 minutes
+      if (now - lastActive > idleLimit) {
+        alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama lebih dari 5 menit.");
+        await handleLogout();
+        return;
+      }
+    }
+
+    // 2. Supabase checks
+    if (_supabase) {
+      try {
+        const { data: user, error } = await _supabase.from('users').select('status, completed_lectures').eq('id', currentUser.id).single();
+        if (user && !error) {
+          // Check account status (Pending / Nonaktif)
+          if (user.status === "Pending" || user.status === "Nonaktif") {
+            alert(`Sesi berakhir: Akun Anda telah ${user.status === "Pending" ? "diubah menjadi Pending" : "dinonaktifkan"} oleh Admin!`);
+            await handleLogout();
+            return;
+          }
+          
+          // Check double login (Session verification)
+          const dbLectures = typeof user.completed_lectures === 'string' ? JSON.parse(user.completed_lectures) : user.completed_lectures;
+          const dbSessionId = dbLectures ? dbLectures.active_session : null;
+          const localSessionId = sessionStorage.getItem('edulearn_session_id');
+          if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
+            alert("Sesi berakhir: Akun Anda telah masuk di perangkat atau browser lain!");
+            await handleLogout();
+          }
+        }
+      } catch (e) {
+        console.error("Session status heartbeat check failed:", e);
+      }
+    }
+  }
+}, 5000); // Check every 5 seconds for responsive idle logging
+
+// ── USER ACTIVITY MONITOR FOR TIMEOUT ──
+function updateLastActive() {
+  if (currentUser) {
+    localStorage.setItem('edulearn_last_active', Date.now().toString());
+  }
+}
+['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
+  window.addEventListener(evt, updateLastActive, { passive: true });
+});
