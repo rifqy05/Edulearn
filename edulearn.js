@@ -962,6 +962,10 @@ function enrollCourseDirectly(courseId) {
     checkAuthStatus();
     return;
   }
+  if (currentUser.role !== 'Siswa') {
+    alert("Kunci Keamanan: Hanya akun dengan peran 'Siswa' yang dapat mendaftar kursus!");
+    return;
+  }
   if (!currentUser.enrolledCourses.includes(courseId)) {
     currentUser.enrolledCourses.push(courseId);
     currentUser.completedLectures[courseId] = []; 
@@ -993,6 +997,10 @@ function triggerPaymentEnroll(courseId) {
   if (!currentUser) {
     alert("Anda harus login terlebih dahulu!");
     checkAuthStatus();
+    return;
+  }
+  if (currentUser.role !== 'Siswa') {
+    alert("Kunci Keamanan: Hanya akun dengan peran 'Siswa' yang dapat membeli kursus!");
     return;
   }
   
