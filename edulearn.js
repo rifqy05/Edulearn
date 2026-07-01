@@ -453,7 +453,8 @@ async function processLogin() {
 
   if (isGoogle) {
     alert('Simulasi: Berhasil masuk via Google OAuth 2.0 (FR-02)');
-    currentUser = JSON.parse(JSON.stringify(allUsers[0])); 
+    const siswaDemo = allUsers.find(u => u.email === "siswa@edulearn.id") || allUsers[0];
+    currentUser = JSON.parse(JSON.stringify(siswaDemo)); 
     currentUser.role = "Siswa";
     
     // Generate session ID for Google login
@@ -508,8 +509,11 @@ async function processLogin() {
     // Clear previous OTP inputs
     const inputs = document.querySelectorAll('#otpInputGroup input');
     inputs.forEach(input => input.value = "");
-    // Open the custom OTP modal
+    
+    // Hide auth modal and show OTP modal to prevent overlay overlap
+    document.getElementById('authModalBackdrop').classList.remove('show');
     document.getElementById('otpModalBackdrop').classList.add('show');
+    
     // Focus the first input box
     setTimeout(() => {
       if (inputs[0]) inputs[0].focus();
@@ -2312,6 +2316,10 @@ function verifyUserAdmin(userId) {
 }
 
 function toggleUserStatus(userId) {
+  if (currentUser && currentUser.id === userId) {
+    alert("Kunci Keamanan: Anda tidak dapat menonaktifkan akun Anda sendiri!");
+    return;
+  }
   const found = allUsers.find(u => u.id === userId);
   if (found) {
     found.status = found.status === "Aktif" ? "Nonaktif" : "Aktif";
@@ -2323,6 +2331,10 @@ function toggleUserStatus(userId) {
 }
 
 function switchUserRoleAdmin(userId) {
+  if (currentUser && currentUser.id === userId) {
+    alert("Kunci Keamanan: Anda tidak dapat mengubah peran akun Anda sendiri!");
+    return;
+  }
   const found = allUsers.find(u => u.id === userId);
   if (found) {
     const newRole = found.role === "Siswa" ? "Instruktur" : "Siswa";
@@ -2377,14 +2389,14 @@ async function loadDataFromSupabase() {
         role: u.role,
         status: u.status,
         twoFactor: u.two_factor,
-        enrolledCourses: typeof u.enrolled_courses === 'string' ? JSON.parse(u.enrolled_courses) : u.enrolled_courses,
-        completedLectures: typeof u.completed_lectures === 'string' ? JSON.parse(u.completed_lectures) : u.completed_lectures,
-        studyHours: u.study_hours,
-        certsCount: u.certs_count,
-        examAttempts: typeof u.exam_attempts === 'string' ? JSON.parse(u.exam_attempts) : u.exam_attempts,
-        examPassed: typeof u.exam_passed === 'string' ? JSON.parse(u.exam_passed) : u.exam_passed,
-        examScores: typeof u.exam_scores === 'string' ? JSON.parse(u.exam_scores) : u.exam_scores,
-        examHistory: typeof u.exam_history === 'string' ? JSON.parse(u.exam_history) : u.exam_history
+        enrolledCourses: typeof u.enrolled_courses === 'string' ? JSON.parse(u.enrolled_courses) : (u.enrolled_courses || []),
+        completedLectures: typeof u.completed_lectures === 'string' ? JSON.parse(u.completed_lectures) : (u.completed_lectures || {}),
+        studyHours: u.study_hours || 0,
+        certsCount: u.certs_count || 0,
+        examAttempts: typeof u.exam_attempts === 'string' ? JSON.parse(u.exam_attempts) : (u.exam_attempts || {}),
+        examPassed: typeof u.exam_passed === 'string' ? JSON.parse(u.exam_passed) : (u.exam_passed || {}),
+        examScores: typeof u.exam_scores === 'string' ? JSON.parse(u.exam_scores) : (u.exam_scores || {}),
+        examHistory: typeof u.exam_history === 'string' ? JSON.parse(u.exam_history) : (u.exam_history || [])
       }));
       localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
     }
@@ -2887,6 +2899,7 @@ function handleOtpBackspace(el, event) {
 
 function cancelOtpVerification() {
   document.getElementById('otpModalBackdrop').classList.remove('show');
+  document.getElementById('authModalBackdrop').classList.add('show');
   pendingLoginUser = null;
 }
 
