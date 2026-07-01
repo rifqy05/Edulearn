@@ -445,7 +445,7 @@ function switchAuthTab(type) {
   }
 }
 
-function processLogin() {
+async function processLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPassword').value;
   const isGoogle = document.getElementById('loginGoogleSim').checked;
@@ -455,7 +455,14 @@ function processLogin() {
     alert('Simulasi: Berhasil masuk via Google OAuth 2.0 (FR-02)');
     currentUser = JSON.parse(JSON.stringify(allUsers[0])); 
     currentUser.role = "Siswa";
-    saveAndRestart();
+    
+    // Generate session ID for Google login
+    const sessionId = "sess-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+    sessionStorage.setItem('edulearn_session_id', sessionId);
+    if (!currentUser.completedLectures) currentUser.completedLectures = {};
+    currentUser.completedLectures.active_session = sessionId;
+
+    await saveAndRestart();
     return;
   }
 
@@ -532,7 +539,7 @@ function processLogin() {
   }
   currentUser.completedLectures.active_session = sessionId;
 
-  saveAndRestart();
+  await saveAndRestart();
 }
 
 async function processRegister() {
@@ -594,10 +601,14 @@ async function handleLogout() {
   location.reload();
 }
 
-function saveAndRestart() {
+async function saveAndRestart() {
   sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
   localStorage.setItem('edulearn_explicit_login', 'true');
   localStorage.setItem('edulearn_last_active', Date.now().toString());
+  
+  if (currentUser && typeof syncUserToSupabase === 'function') {
+    await syncUserToSupabase(currentUser);
+  }
   location.reload();
 }
 
@@ -2879,7 +2890,7 @@ function cancelOtpVerification() {
   pendingLoginUser = null;
 }
 
-function submitOtpVerification() {
+async function submitOtpVerification() {
   const inputs = document.querySelectorAll('#otpInputGroup input');
   let enteredCode = "";
   inputs.forEach(input => enteredCode += input.value);
@@ -2917,5 +2928,5 @@ function submitOtpVerification() {
   }
   currentUser.completedLectures.active_session = sessionId;
 
-  saveAndRestart();
+  await saveAndRestart();
 }
