@@ -453,9 +453,17 @@ async function processLogin() {
 
   if (isGoogle) {
     alert('Simulasi: Berhasil masuk via Google OAuth 2.0 (FR-02)');
-    const siswaDemo = allUsers.find(u => u.email === "siswa@edulearn.id") || allUsers[0];
+    let targetUser = null;
+    if (email) {
+      targetUser = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase() || u.name.toLowerCase() === email.toLowerCase());
+    }
+    const siswaDemo = targetUser || allUsers.find(u => u.email === "siswa@edulearn.id") || allUsers[0];
     currentUser = JSON.parse(JSON.stringify(siswaDemo)); 
-    currentUser.role = "Siswa";
+    
+    // Google Sign-in simulation should not override non-demo user roles
+    if (!targetUser && siswaDemo.email === "siswa@edulearn.id") {
+      currentUser.role = "Siswa";
+    }
     
     // Generate session ID for Google login
     const sessionId = "sess-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
@@ -463,7 +471,11 @@ async function processLogin() {
     if (!currentUser.completedLectures) currentUser.completedLectures = {};
     currentUser.completedLectures.active_session = sessionId;
 
-    await saveAndRestart();
+    // Save session locally and reload directly without syncing overridden role to Supabase
+    sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
+    localStorage.setItem('edulearn_explicit_login', 'true');
+    localStorage.setItem('edulearn_last_active', Date.now().toString());
+    location.reload();
     return;
   }
 
@@ -480,7 +492,11 @@ async function processLogin() {
     return;
   }
 
-  const found = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+  // Allow searching by both email and name for manual login to support "rifqy" style usernames
+  const found = allUsers.find(u => 
+    u.email.toLowerCase() === email.toLowerCase() || 
+    u.name.toLowerCase() === email.toLowerCase()
+  );
   if (!found || found.password !== pass) {
     alert('Username & Password tidak sesuai');
     return;
@@ -675,9 +691,25 @@ function getAvatarInitials(name) {
 }
 
 
-// ══════════════════════════════════════════
-//  SISWA CODE (STUDENT ACTIONS)
-// ══════════════════════════════════════════
+function getCompletedLecturesArray(courseId) {
+  if (!currentUser || !currentUser.completedLectures) return [];
+  const val = currentUser.completedLectures[courseId];
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    return val.trim() === '' ? [] : val.split(' ');
+  }
+  return [];
+}
+
+function setCompletedLecturesArray(courseId, arr) {
+  if (!currentUser) return;
+  if (!currentUser.completedLectures) {
+    currentUser.completedLectures = {};
+  }
+  currentUser.completedLectures[courseId] = arr.join(' ');
+}
+
 function renderStudentDashboard() {
   document.getElementById('welcomeHeading').textContent = `Selamat Datang, ${currentUser.name}! 👋`;
   
@@ -703,7 +735,7 @@ function renderStudentDashboard() {
     const course = allCourses.find(c => c.id === cId);
     if (course) {
       totalSyllabusChapters += course.syllabus.length;
-      const completedList = currentUser.completedLectures[cId] || [];
+      const completedList = getCompletedLecturesArray(cId);
       completedSyllabusChapters += completedList.length;
       
       course.syllabus.forEach(lec => {
@@ -745,7 +777,7 @@ function renderStudentDashboard() {
     const course = allCourses.find(c => c.id === cId);
     if (!course) return;
     
-    const completedList = currentUser.completedLectures[cId] || [];
+    const completedList = getCompletedLecturesArray(cId);
     const coursePct = Math.round((completedList.length / course.syllabus.length) * 100);
     
     const card = document.createElement('div');
@@ -1140,7 +1172,7 @@ function renderPlayerSyllabus() {
   const list = document.getElementById('playerSyllabusList');
   list.innerHTML = '';
   
-  const completedList = currentUser.completedLectures[cId] || [];
+  const completedList = getCompletedLecturesArray(cId);
   
   activePlayerCourse.syllabus.forEach((lec, idx) => {
     const isCompleted = completedList.includes(lec.id);
@@ -1193,11 +1225,7 @@ function renderPlayerSyllabus() {
 function handleLectureCheckboxToggle(lectureId, isChecked, event) {
   event.stopPropagation();
   const cId = activePlayerCourse.id;
-  if (!currentUser.completedLectures[cId]) {
-    currentUser.completedLectures[cId] = [];
-  }
-  
-  const completedList = currentUser.completedLectures[cId];
+  const completedList = getCompletedLecturesArray(cId);
   if (isChecked) {
     if (!completedList.includes(lectureId)) {
       completedList.push(lectureId);
@@ -1209,6 +1237,7 @@ function handleLectureCheckboxToggle(lectureId, isChecked, event) {
     }
   }
   
+  setCompletedLecturesArray(cId, completedList);
   saveDataToStorage();
   renderPlayerSyllabus();
 }
@@ -1326,9 +1355,10 @@ function startMockVideo() {
       stopMockVideo();
       
       const activeLec = activePlayerCourse.syllabus[activePlayerLectureIndex];
-      const completedList = currentUser.completedLectures[activePlayerCourse.id];
+      const completedList = getCompletedLecturesArray(activePlayerCourse.id);
       if (!completedList.includes(activeLec.id)) {
         completedList.push(activeLec.id);
+        setCompletedLecturesArray(activePlayerCourse.id, completedList);
         saveDataToStorage();
         renderPlayerSyllabus();
         alert(`Materi '${activeLec.title}' selesai ditonton! Progress belajar terupdate.`);
@@ -2893,7 +2923,7 @@ function moveOtpFocus(el, index) {
   }
 }
 
-function handleOtpBackspace(el, event) {
+function handleOtpKeyDown(el, event) {
   if (event.key === "Backspace" && el.value.length === 0) {
     const inputs = document.querySelectorAll('#otpInputGroup input');
     for (let i = 1; i < inputs.length; i++) {
@@ -2902,6 +2932,8 @@ function handleOtpBackspace(el, event) {
         break;
       }
     }
+  } else if (event.key === "Enter") {
+    submitOtpVerification();
   }
 }
 
