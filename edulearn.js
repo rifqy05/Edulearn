@@ -226,14 +226,14 @@ function loadDataFromStorage() {
   allTransactions = JSON.parse(localStorage.getItem('edulearn_transactions')) || [];
 }
 
-function saveDataToStorage() {
+function saveDataToStorage(shouldSync = true) {
   sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
   localStorage.setItem('edulearn_courses', JSON.stringify(allCourses));
   localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
   localStorage.setItem('edulearn_forums', JSON.stringify(allForums));
   localStorage.setItem('edulearn_transactions', JSON.stringify(allTransactions));
   
-  if (currentUser && typeof syncUserToSupabase === 'function') {
+  if (shouldSync && currentUser && typeof syncUserToSupabase === 'function') {
     syncUserToSupabase(currentUser);
   }
 }
@@ -471,11 +471,8 @@ async function processLogin() {
     if (!currentUser.completedLectures) currentUser.completedLectures = {};
     currentUser.completedLectures.active_session = sessionId;
 
-    // Save session locally and reload directly without syncing overridden role to Supabase
-    sessionStorage.setItem('edulearn_current_user', JSON.stringify(currentUser));
-    localStorage.setItem('edulearn_explicit_login', 'true');
-    localStorage.setItem('edulearn_last_active', Date.now().toString());
-    location.reload();
+    // Save session locally, sync active session to Supabase, and reload to avoid immediate logout
+    await saveAndRestart();
     return;
   }
 
@@ -594,11 +591,15 @@ async function processRegister() {
     twoFactor: false
   };
 
+  // Sync new user to Supabase to prevent loss on reload
+  const syncSuccess = await syncUserToSupabase(newUser);
+  if (!syncSuccess) {
+    alert('Gagal registrasi: Tidak dapat menghubungkan data ke database cloud Supabase. Silakan periksa koneksi internet Anda.');
+    return;
+  }
+
   allUsers.push(newUser);
   localStorage.setItem('edulearn_users', JSON.stringify(allUsers));
-  
-  // Sync new user to Supabase to prevent loss on reload
-  await syncUserToSupabase(newUser);
   
   alert('Registrasi akun baru berhasil! Akun Anda membutuhkan verifikasi Admin sebelum dapat digunakan. Gunakan akun demo yang tersedia untuk menguji langsung.');
   switchAuthTab('login');
@@ -675,7 +676,7 @@ async function saveProfileSettings() {
     allUsers[uIdx].twoFactor = twoFa;
   }
   
-  saveDataToStorage();
+  saveDataToStorage(false);
   
   if (typeof syncUserToSupabase === 'function') {
     await syncUserToSupabase(currentUser);
@@ -2351,33 +2352,39 @@ function filterAdminUserTable() {
   renderAdminUserTable();
 }
 
-function verifyUserAdmin(userId) {
+async function verifyUserAdmin(userId) {
   const found = allUsers.find(u => u.id === userId);
   if (found) {
+    const searchInput = document.getElementById('adminUserSearchInput');
+    if (searchInput) searchInput.value = '';
+
     found.status = "Aktif";
     saveDataToStorage();
-    syncUserToSupabase(found);
+    await syncUserToSupabase(found);
     renderAdminUserTable();
     alert(`Akun ${found.name} telah berhasil diverifikasi oleh Admin!`);
   }
 }
 
-function toggleUserStatus(userId) {
+async function toggleUserStatus(userId) {
   if (currentUser && currentUser.id === userId) {
     alert("Kunci Keamanan: Anda tidak dapat menonaktifkan akun Anda sendiri!");
     return;
   }
   const found = allUsers.find(u => u.id === userId);
   if (found) {
+    const searchInput = document.getElementById('adminUserSearchInput');
+    if (searchInput) searchInput.value = '';
+
     found.status = found.status === "Aktif" ? "Nonaktif" : "Aktif";
     saveDataToStorage();
-    syncUserToSupabase(found);
+    await syncUserToSupabase(found);
     renderAdminUserTable();
     alert(`Status akun ${found.name} berhasil diubah.`);
   }
 }
 
-function switchUserRoleAdmin(userId) {
+async function switchUserRoleAdmin(userId) {
   if (currentUser && currentUser.id === userId) {
     alert("Kunci Keamanan: Anda tidak dapat mengubah peran akun Anda sendiri!");
     return;
@@ -2387,16 +2394,19 @@ function switchUserRoleAdmin(userId) {
     const newRole = found.role === "Siswa" ? "Instruktur" : "Siswa";
     const conf = confirm(`Ubah hak akses akun ${found.name} menjadi ${newRole}?`);
     if (conf) {
+      const searchInput = document.getElementById('adminUserSearchInput');
+      if (searchInput) searchInput.value = '';
+
       found.role = newRole;
       saveDataToStorage();
-      syncUserToSupabase(found);
+      await syncUserToSupabase(found);
       renderAdminUserTable();
       alert(`Hak akses akun ${found.name} berhasil diubah menjadi ${newRole}.`);
     }
   }
 }
 
-function deleteUserAdmin(userId) {
+async function deleteUserAdmin(userId) {
   if (currentUser && currentUser.id === userId) {
     alert("Kunci Keamanan: Anda tidak dapat menghapus akun Anda sendiri!");
     return;
@@ -2405,9 +2415,12 @@ function deleteUserAdmin(userId) {
   if (found) {
     const conf = confirm(`Apakah Anda yakin ingin menghapus akun ${found.name} secara permanen? Tindakan ini akan menghapus data akun dari database cloud Supabase dan tidak bisa dibatalkan.`);
     if (conf) {
+      const searchInput = document.getElementById('adminUserSearchInput');
+      if (searchInput) searchInput.value = '';
+
       allUsers = allUsers.filter(u => u.id !== userId);
       saveDataToStorage();
-      deleteUserFromSupabase(userId);
+      await deleteUserFromSupabase(userId);
       renderAdminUserTable();
       alert(`Akun ${found.name} telah berhasil dihapus dari sistem.`);
     }
@@ -2573,7 +2586,7 @@ async function loadDataFromSupabase() {
 }
 
 async function syncUserToSupabase(u) {
-  if (!_supabase) return;
+  if (!_supabase) return true;
   try {
     const { error } = await _supabase.from('users').upsert({
       id: u.id,
@@ -2593,8 +2606,10 @@ async function syncUserToSupabase(u) {
       exam_history: u.examHistory || []
     });
     if (error) throw error;
+    return true;
   } catch (err) {
     console.error("Sync user failed:", err);
+    return false;
   }
 }
 
